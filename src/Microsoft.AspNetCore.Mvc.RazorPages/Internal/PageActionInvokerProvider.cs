@@ -224,7 +224,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             {
                 var methodName = _handlerMethodNames[i];
                 var method = type.GetMethod(methodName);
-                if (method != null)
+                if (method != null && !method.IsGenericMethod)
                 {
                     actionDescriptor.HandlerMethods.Add(new HandlerMethodDescriptor()
                     {

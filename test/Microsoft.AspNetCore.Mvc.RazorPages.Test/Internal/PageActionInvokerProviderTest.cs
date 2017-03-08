@@ -356,11 +356,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             Assert.NotSame(entry1, entry2);
         }
 
-        [Theory]
-        [InlineData(typeof(InheritsMethods), 2)]
-        [InlineData(typeof(ProtectedModel), 0)]
-        [InlineData(typeof(TestPageModel), 1)]
-        public void FindsAllHandlerMethodDescriptors(Type pageType, int expectedCount)
+        [Fact]
+        public void PopulateHandlerMethodDescriptors_DiscoversHandlersFromBaseType()
         {
             // Arrange
             var descriptor = new PageActionDescriptor()
@@ -370,7 +367,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 ViewEnginePath = "/Views/Deeper/Index.cshtml"
             };
 
-            var actionDescriptor = CreateCompiledPageActionDescriptor(descriptor, pageType);
+            var actionDescriptor = CreateCompiledPageActionDescriptor(descriptor, typeof(InheritsMethods));
 
             var type = actionDescriptor.ModelTypeInfo ?? actionDescriptor.PageTypeInfo;
 
@@ -378,7 +375,84 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             PageActionInvokerProvider.PopulateHandlerMethodDescriptors(type, actionDescriptor);
 
             // Assert
-            Assert.Equal(expectedCount, actionDescriptor.HandlerMethods.Count);
+            Assert.Collection(actionDescriptor.HandlerMethods,
+                (handler) =>
+                {
+                    Assert.Equal("OnGet", handler.Method.Name);
+                    Assert.Equal(typeof(InheritsMethods), handler.Method.DeclaringType);
+                },
+                (handler) =>
+                {
+                    Assert.Equal("OnPost", handler.Method.Name);
+                    Assert.Equal(typeof(TestSetPageModel), handler.Method.DeclaringType);
+                });
+        }
+
+        [Fact]
+        public void PopulateHandlerMethodDescriptors_ProtectedMethodsNotFound()
+        {
+            // Arrange
+            var descriptor = new PageActionDescriptor()
+            {
+                RelativePath = "Path1",
+                FilterDescriptors = new FilterDescriptor[0],
+                ViewEnginePath = "/Views/Deeper/Index.cshtml"
+            };
+
+            var actionDescriptor = CreateCompiledPageActionDescriptor(descriptor, typeof(ProtectedModel));
+
+            var type = actionDescriptor.ModelTypeInfo ?? actionDescriptor.PageTypeInfo;
+
+            // Act
+            PageActionInvokerProvider.PopulateHandlerMethodDescriptors(type, actionDescriptor);
+
+            // Assert
+            Assert.Empty(actionDescriptor.HandlerMethods);
+        }
+
+        [Fact]
+        public void PopulateHandlerMethodDescriptors_IgnoreGenericTypeParameters()
+        {
+            // Arrange
+            var descriptor = new PageActionDescriptor()
+            {
+                RelativePath = "Path1",
+                FilterDescriptors = new FilterDescriptor[0],
+                ViewEnginePath = "/Views/Deeper/Index.cshtml"
+            };
+
+            var actionDescriptor = CreateCompiledPageActionDescriptor(descriptor, typeof(GenericClassModel));
+
+            var type = actionDescriptor.ModelTypeInfo ?? actionDescriptor.PageTypeInfo;
+
+            // Act
+            PageActionInvokerProvider.PopulateHandlerMethodDescriptors(type, actionDescriptor);
+
+            // Assert
+            Assert.Empty(actionDescriptor.HandlerMethods);
+        }
+
+        [Fact]
+        public void PopulateHandlerMethodDescriptors_AllowOnlyOneMethod()
+        {
+            // Arrange
+            var descriptor = new PageActionDescriptor()
+            {
+                RelativePath = "Path1",
+                FilterDescriptors = new FilterDescriptor[0],
+                ViewEnginePath = "/Views/Deeper/Index.cshtml"
+            };
+
+            var actionDescriptor = CreateCompiledPageActionDescriptor(descriptor, typeof(TestPageModel));
+
+            var type = actionDescriptor.ModelTypeInfo ?? actionDescriptor.PageTypeInfo;
+
+            // Act
+            PageActionInvokerProvider.PopulateHandlerMethodDescriptors(type, actionDescriptor);
+
+            // Assert
+            var handler = Assert.Single(actionDescriptor.HandlerMethods);
+            Assert.Equal("OnGet", handler.Method.Name);
         }
 
         [Fact]
@@ -409,11 +483,14 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var mock = new Mock<IRazorPageFactoryProvider>();
             mock.Setup(p => p.CreateFactory("/Views/Deeper/_PageStart.cshtml"))
-                .Returns(new RazorPageFactoryResult(() => null, new List<IChangeToken>()));
+                .Returns(new RazorPageFactoryResult(() => null, new List<IChangeToken>()))
+                .Verifiable();
             mock.Setup(p => p.CreateFactory("/Views/_PageStart.cshtml"))
-                .Returns(new RazorPageFactoryResult(() => null, new List<IChangeToken>()));
+                .Returns(new RazorPageFactoryResult(() => null, new List<IChangeToken>()))
+                .Verifiable();
             mock.Setup(p => p.CreateFactory("/_PageStart.cshtml"))
-                .Returns(new RazorPageFactoryResult(() => null, new List<IChangeToken>()));
+                .Returns(new RazorPageFactoryResult(() => null, new List<IChangeToken>()))
+                .Verifiable();
             var razorPageFactoryProvider = mock.Object;
 
             var invokerProvider = CreateInvokerProvider(
@@ -430,7 +507,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             var factories = invokerProvider.GetPageStartFactories(compiledDescriptor);
 
             // Assert
-            Assert.Equal(3, factories.Count);
+            mock.Verify();
         }
 
         [Fact]
@@ -469,7 +546,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             var factories = invokerProvider.GetPageStartFactories(compiledDescriptor);
 
             // Assert
-            Assert.Equal(0, factories.Count);
+            Assert.Empty(factories);
         }
 
         private IRazorPageFactoryProvider CreateRazorPageFactoryProvider()
@@ -537,6 +614,14 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 NullLoggerFactory.Instance);
         }
 
+        private class GenericClassModel
+        {
+            public void OnGet<T>()
+            {
+
+            }
+        }
+
         private class TestSetPageWithModel
         {
             public TestSetPageModel Model { get; set; }
@@ -548,11 +633,6 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             {
 
             }
-        }
-
-        private class ProtectedPage
-        {
-            public ProtectedModel Model { get; set; }
         }
 
         private class ProtectedModel

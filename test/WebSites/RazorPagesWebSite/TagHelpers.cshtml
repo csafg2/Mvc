@@ -1,0 +1,13 @@
+﻿@page
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+@functions {
+        public class Post
+        {
+            public int Id { get; set; }
+            public string Title { get; set; }
+        }
+        public Post post = new Post { Id = 2, Title = "Post title" };
+}
+
+<a asp-route-page="/Show" asp-route-id="@post.Id">@post.Title</a>

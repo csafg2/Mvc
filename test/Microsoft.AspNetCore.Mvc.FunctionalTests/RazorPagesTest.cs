@@ -19,6 +19,21 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
         public HttpClient Client { get; }
 
         [Fact]
+        public async Task TagHelper_InvalidIndexerDoesNotFail()
+        {
+            // Arrange
+            var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/TagHelpers");
+
+            // Act
+            var response = await Client.SendAsync(request);
+
+            // Assert
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("<a href=\"/Show?id=2\">Post title</a>", content.Trim());
+        }
+
+        [Fact]
         public async Task NoPage_NotFound()
         {
             // Arrange

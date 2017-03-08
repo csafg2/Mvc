@@ -106,7 +106,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure
                 PageTypeInfo = typeof(ViewDataTestPage).GetTypeInfo(),
                 ModelTypeInfo = typeof(ViewDataTestPageModel).GetTypeInfo()
             };
-            descriptor.ViewEnginePath = "/this/is/a/path.cshtml";
+            descriptor.RelativePath = "/this/is/a/path.cshtml";
 
             var pageContext = new PageContext
             {
